@@ -7,51 +7,101 @@ const truffleAssert = require('truffle-assertions');
 
 //new contract to test out the Market Order Test functionality 
 contract ("Market Order Functionality", accounts => {
-    //when Creatng a SELL market Order, the seller needs to have enough tokens for the trade
-    it("When creating a SELL market order, the seller needs to have enough tokens for the trade", async() => {
-        let dex = await Dex.deployed();
-        let link = await Link.deployed();
-        await truffleAssert.reverts(
-            dex.createMarketOrder(1,web3.utils.fromUtf8("Link"),500)
-        )
-        await link.approve(dex.address,500)
-        await dex.deposit(500, web3.utils.fromUtf8("Link"))
-        await truffleAssert.passes(
-            
-            dex.createMarketOrder(1,web3.utils.fromUtf8("Link"),500)
-        )
-
-    })
     //When Creating a BUY market Order, the buyer needs to have enough ETH for the trade
-    it("When creating a BUY market order, the seller needs to have enough ETH for the trade", async() => {
+    it.skip("When Creating a BUY market Order, the buyer needs to have enough ETH for the trade", async() => {
         let dex = await Dex.deployed();
         let link = await Link.deployed();
-        let eth2= await Eth2.deployed();
+        let eth2 = await Eth2.deployed();
+
+        //adding tokens to Dex
+        dex.addToken(web3.utils.fromUtf8("Link"),link.address);
+        dex.addToken(web3.utils.fromUtf8("ETH2"),eth2.address);
+
+       
+
+        //approve Dex to spend Eth2 accounts 1
+        await eth2.approve(dex.address, 5000, {from: accounts[0]});
+        await eth2.approve(dex.address, 1500, {from: accounts[1]});
+
+        await link.approve(dex.address,200,{from: accounts[0]})
+        await link.approve(dex.address,200,{from: accounts[1]})
+
+        //Send Eth2 tokens to Accounts 1 from account 0
+        await eth2.transfer(accounts[1],150);
+        await link.transfer(accounts[1],150);
+
+       
+        
+        await dex.deposit(200, web3.utils.fromUtf8("Link"),{from:accounts[0]});
+        await dex.deposit(150, web3.utils.fromUtf8("Link"),{from:accounts[1]});
+
+        await dex.createLimitOrder(1,web3.utils.fromUtf8("Link"),100, 3,{from: accounts[0]});
+        await dex.createLimitOrder(1,web3.utils.fromUtf8("Link"),150, 1,{from: accounts[1]});
         await truffleAssert.reverts(
             dex.createMarketOrder(0,web3.utils.fromUtf8("Link"),500)
         )
-        await eth2.approve(dex.address,500)
-        await dex.deposit(500, web3.utils.fromUtf8("ETH2"))
+         //deposit Eth2 into accounts 0 and 1 of Dex
+         await dex.deposit(300, web3.utils.fromUtf8("ETH2"),{from:accounts[0]});
+         await dex.deposit(150, web3.utils.fromUtf8("ETH2"),{from:accounts[1]});
+        let orderBook = await dex.getOrderBook(web3.utils.fromUtf8("Link"),0);
+        console.log(orderBook);
+        let owner1Bal = await dex.balances(accounts[0],web3.utils.fromUtf8("ETH2"));
+        console.log(owner1Bal);
+        let owner2Bal = await dex.balances(accounts[1],web3.utils.fromUtf8("ETH2"));
+        console.log(owner2Bal);
         await truffleAssert.passes(
             
-            dex.createMarketOrder(0,web3.utils.fromUtf8("Link"),100)
+            dex.createMarketOrder(0,web3.utils.fromUtf8("Link"),5,{from: accounts[1]})
+       )
+      
+    })
+    //when Creatng a SELL market Order, the seller needs to have enough tokens for the trade
+     
+    it("when Creatng a SELL market Order, the seller needs to have enough tokens for the trade", async() => {
+        let dex = await Dex.deployed();
+        let link = await Link.deployed();
+        let eth2 = await Eth2.deployed();
+
+        //adding tokens to the Dex
+        dex.addToken(web3.utils.fromUtf8("Link"),link.address);
+        dex.addToken(web3.utils.fromUtf8("ETH2"), eth2.address);
+       
+        //approving dex for Link token
+        await link.approve(dex.address,100,{from:accounts[0]});
+        
+        let owner1Bal = await dex.balances(accounts[0],web3.utils.fromUtf8("Link"));
+        console.log(owner1Bal);
+        //should revert since there are no Link tokens in dex countract
+       await truffleAssert.reverts(
+            dex.createMarketOrder(1,web3.utils.fromUtf8("Link"),500)
         )
+        //depositing link to dex contract
+        await dex.deposit(100, web3.utils.fromUtf8("Link"),{from:accounts[0]});
+
+
+        
+        await truffleAssert.passes(
+            
+            dex.createMarketOrder(1, web3.utils.fromUtf8("Link"),5,{from: accounts[0]})
+       )
 
     })
+    
     //Market Orders can be submitted even if the order book is empty
-    it("Market Orders can be submitted even if the order book is empty", async() => {
+    it.skip("Market Orders can be submitted even if the order book is empty", async() => {
         let dex = await Dex.deployed();
         //getting the buy side of the order book
         let orderBook = await dex.getOrderBook(web3.utils.fromUtf8("Link"),0) ;
-        assert(orderBook.legnth == 0, "buy side of the order book should be empty");
+        assert(orderBook.length == 0, "buy side of the order book should be empty");
         await truffleAssert.passes(
             dex.createMarketOrder(0, web3.utils.fromUtf8("Link"), 10)
         );       
 
     })
+    
     //Market order should be filled until the orderbook is empty or the market order is 100% filled
     //this will be broken down into 2 tests which will check
-    it("Market orders should be filled until 100% filled", async() => {
+    it.skip("Market orders should be filled until 100% filled", async() => {
         let dex = await Dex.deployed();
         let link = await Link.deployed();
         
@@ -89,7 +139,7 @@ contract ("Market Order Functionality", accounts => {
     })
     //Market order should be filled until the orderbook is empty or the market order is 100% filled
     //this will be broken down into 2 tests which will check
-    it("Market orders should be filled until The buy orderbook is empty", async() => {
+    it.skip("Market orders should be filled until The buy orderbook is empty", async() => {
         let dex = await Dex.deployed();
         let link = await Link.deployed();
         
@@ -126,7 +176,7 @@ contract ("Market Order Functionality", accounts => {
 
     })
     //the token balacnes of the sellers should decrease with the filled amounts
-    it("the token balacnes of the sellers should decrease with the filled amounts", async() => {
+    it.skip("the token balacnes of the sellers should decrease with the filled amounts", async() => {
         let dex = await Dex.deployed();
         let link = await Link.deployed();
         
@@ -171,6 +221,7 @@ contract ("Market Order Functionality", accounts => {
         assert(afterBalance3 == previousBalance1 - 80,"The Link balance for Account 3 is not correct");
 
     })
+    
 
 
 })
